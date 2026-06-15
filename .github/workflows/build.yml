@@ -13,21 +13,8 @@ jobs:
       - name: Unpack IPA
         run: unzip -q MyRadar.ipa -d Unpacked
 
-      - name: Compile new fuck.dylib
-        run: |
-          clang -arch arm64 \
-            -isysroot $(xcrun --sdk iphoneos --show-sdk-path) \
-            -framework UIKit \
-            -framework Foundation \
-            -miphoneos-version-min=15.0 \
-            -fobjc-arc \
-            -dynamiclib \
-            -o fuck.dylib \
-            fuck.m
-
       - name: Replace fuck.dylib
-        run: |
-          cp fuck.dylib Unpacked/Payload/MyRadar.app/fuck.dylib
+        run: cp fuck.dylib Unpacked/Payload/MyRadar.app/fuck.dylib
 
       - name: Sign
         run: |
