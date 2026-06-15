@@ -29,14 +29,7 @@ static BOOL hook_initRsa(id self, SEL _cmd,
 
 __attribute__((constructor))
 static void _zx_init() {
-    // 直接 hook，不延迟，确保在 T3 初始化之前装上
     Class t3Class = NSClassFromString(@"T3Verify");
     if (!t3Class) return;
-
     SEL sel = @selector(initRsaWithLoginCode:noticeCode:versionCode:heartbeatCode:appkey:rsaPublicKey:error:);
     Method m = class_getInstanceMethod(t3Class, sel);
-    if (!m) return;
-
-    orig_initRsa = (initRsa_t)method_getImplementation(m);
-    method_setImplementation(m, (IMP)hook_initRsa);
-}
