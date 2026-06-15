@@ -1,0 +1,55 @@
+name: Build ZX IPA
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unpack IPA
+        run: unzip -q MyRadar.ipa -d Unpacked
+
+      - name: Compile zxhook dylib
+        run: |
+          clang -arch arm64 \
+            -isysroot $(xcrun --sdk iphoneos --show-sdk-path) \
+            -framework UIKit \
+            -framework Foundation \
+            -miphoneos-version-min=15.0 \
+            -fobjc-arc \
+            -dynamiclib \
+            -o zxhook.dylib \
+            zxhook.m
+
+      - name: Inject zxhook dylib
+        run: |
+          cp zxhook.dylib Unpacked/Payload/MyRadar.app/
+          git clone https://github.com/tyilo/insert_dylib
+          cd insert_dylib
+          xcodebuild -target insert_dylib -configuration Release > /dev/null 2>&1
+          sudo cp build/Release/insert_dylib /usr/local/bin/
+          cd ..
+          insert_dylib --strip-codesig --inplace \
+            "@executable_path/zxhook.dylib" \
+            Unpacked/Payload/MyRadar.app/MyRadar
+
+      - name: Sign
+        run: |
+          brew install ldid
+          ldid -S Unpacked/Payload/MyRadar.app/MyRadar
+          ldid -S Unpacked/Payload/MyRadar.app/zxhook.dylib
+
+      - name: Repack IPA
+        run: |
+          cd Unpacked
+          zip -qr ../ZX.ipa .
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZX
+          path: ZX.ipa
