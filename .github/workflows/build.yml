@@ -11,59 +11,74 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # ---------- 编译 zxui.m 生成 zxui.dylib ----------
       - name: Compile zxui.dylib
         run: |
-          SDK=$(xcrun --sdk iphoneos --show-sdk-path)
           clang -arch arm64 \
-                -isysroot "$SDK" \
-                -mios-version-min=13.0 \
-                -dynamiclib \
-                -fobjc-arc \
-                -fobjc-runtime=ios \
-                -framework UIKit \
-                -framework Foundation \
-                -framework CoreGraphics \
-                -framework QuartzCore \
-                -lobjc \
-                -O2 \
-                -Wno-deprecated-declarations \
-                -Wno-unused-variable \
-                -o zxui.dylib \
-                zxui.m
+            -isysroot $(xcrun --sdk iphoneos --show-sdk-path) \
+            -framework UIKit \
+            -framework Foundation \
+            -framework CoreGraphics \
+            -framework QuartzCore \
+            -framework Security \
+            -Wno-deprecated-declarations \
+            -Wno-objc-missing-super-calls \
+            -Wno-unused-variable \
+            -miphoneos-version-min=13.0 \
+            -fobjc-arc \
+            -dynamiclib \
+            zxui.m \
+            -o zxui.dylib
+          echo "✅ zxui.dylib 编译完成，大小: $(ls -lh zxui.dylib)"
 
-      # 下载 insert_dylib（更可靠的加载命令注入工具）
-      - name: Download insert_dylib
-        run: |
-          curl -L -o insert_dylib.zip https://github.com/tyilo/insert_dylib/releases/download/1.0.0/insert_dylib.zip
-          unzip insert_dylib.zip
-          chmod +x insert_dylib
-
+      # ---------- 解压 IPA ----------
       - name: Unpack IPA
-        run: unzip -q MyRadar.ipa -d Unpacked
-
-      - name: Copy original fuck.dylib
-        run: cp fuck.dylib Unpacked/Payload/MyRadar.app/fuck.dylib
-
-      - name: Copy new zxui.dylib
-        run: cp zxui.dylib Unpacked/Payload/MyRadar.app/zxui.dylib
-
-      # 注入加载命令，使 MyRadar 启动时加载 zxui.dylib
-      - name: Inject load command
         run: |
-          ./insert_dylib @executable_path/zxui.dylib Unpacked/Payload/MyRadar.app/MyRadar --all-yes
+          unzip -q MyRadar.ipa -d Unpacked
+          echo "✅ IPA 解压完成"
 
-      - name: Install ldid and sign
+      # ---------- 复制两个 dylib ----------
+      - name: Copy dylibs
+        run: |
+          cp fuck.dylib Unpacked/Payload/MyRadar.app/
+          cp zxui.dylib Unpacked/Payload/MyRadar.app/
+          echo "✅ dylib 复制完成"
+
+      # ---------- 编译 insert_dylib（稳定可靠） ----------
+      - name: Build insert_dylib
+        run: |
+          git clone https://github.com/tyilo/insert_dylib
+          cd insert_dylib
+          xcodebuild -target insert_dylib -configuration Release
+          sudo cp build/Release/insert_dylib /usr/local/bin/
+          cd ..
+          echo "✅ insert_dylib 编译完成"
+
+      # ---------- 注入加载命令 ----------
+      - name: Inject dylib
+        run: |
+          insert_dylib --strip-codesig --inplace \
+            "@executable_path/zxui.dylib" \
+            Unpacked/Payload/MyRadar.app/MyRadar
+          echo "✅ 加载命令注入完成"
+
+      # ---------- 签名 ----------
+      - name: Sign
         run: |
           brew install ldid
           ldid -S Unpacked/Payload/MyRadar.app/MyRadar
           ldid -S Unpacked/Payload/MyRadar.app/fuck.dylib
           ldid -S Unpacked/Payload/MyRadar.app/zxui.dylib
+          echo "✅ 签名完成"
 
+      # ---------- 重新打包 ----------
       - name: Repack IPA
         run: |
           cd Unpacked
           zip -qr ../ZX.ipa .
+          echo "✅ 打包完成，IPA 大小: $(ls -lh ../ZX.ipa)"
 
+      # ---------- 上传 ----------
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
