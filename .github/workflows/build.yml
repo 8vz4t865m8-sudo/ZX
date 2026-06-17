@@ -11,42 +11,36 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # ---------- 1. 列出 IPA 结构 ----------
-      - name: List IPA structure
-        run: |
-          echo "=== IPA 文件列表 ==="
-          unzip -l MyRadar.ipa | head -30
-          echo "=== 解压并查看 Payload ==="
-          unzip -q MyRadar.ipa -d Unpacked
-          ls -la Unpacked/Payload/
-          APP_NAME=$(ls Unpacked/Payload/ | head -1)
-          echo "APP_NAME=$APP_NAME" >> $GITHUB_ENV
-          echo "应用名称: $APP_NAME"
-          echo "=== 可执行文件信息 ==="
-          cd Unpacked/Payload/$APP_NAME
-          EXECUTABLE=$(ls -l | grep -v "\.app" | grep -v "^d" | head -1 | awk '{print $NF}')
-          echo "EXECUTABLE=$EXECUTABLE" >> $GITHUB_ENV
-          echo "可执行文件: $EXECUTABLE"
-          echo "=== 包含的 Objective-C 类（前20个） ==="
-          nm -gU "$EXECUTABLE" | grep "OBJC_CLASS" | head -20
+      # ---------- 解压 ----------
+      - name: Unpack IPA
+        run: unzip -q MyRadar.ipa -d Unpacked
 
-      # ---------- 2. 提取真实类名和方法名 ----------
+      # ---------- 直接指定可执行文件名称 ----------
+      - name: Set environment
+        run: |
+          echo "APP_NAME=MyRadar.app" >> $GITHUB_ENV
+          echo "EXECUTABLE=MyRadar" >> $GITHUB_ENV
+
+      # ---------- 提取真实类名和方法名 ----------
       - name: Extract real names
         id: extract
         run: |
-          APP_PATH="Unpacked/Payload/$APP_NAME"
-          BINARY="$APP_PATH/$EXECUTABLE"
-          REAL_CLASS=$(nm -gU "$BINARY" | grep "OBJC_CLASS" | grep -E "Controller|View" | head -1 | sed 's/.*_$_//')
+          BINARY="Unpacked/Payload/$APP_NAME/$EXECUTABLE"
+          echo "正在分析: $BINARY"
+          REAL_CLASS=$(nm -gU "$BINARY" 2>/dev/null | grep "OBJC_CLASS" | grep -E "Controller|View" | head -1 | sed 's/.*_$_//')
           if [ -z "$REAL_CLASS" ]; then
-            REAL_CLASS=$(nm -gU "$BINARY" | grep "OBJC_CLASS" | head -1 | sed 's/.*_$_//')
+            REAL_CLASS=$(nm -gU "$BINARY" 2>/dev/null | grep "OBJC_CLASS" | head -1 | sed 's/.*_$_//')
           fi
           echo "REAL_CLASS=$REAL_CLASS" >> $GITHUB_ENV
-          REAL_AUTH=$(strings "$BINARY" | grep -E "build.*Auth|build.*View|setupAuth" | head -1)
-          REAL_MAIN=$(strings "$BINARY" | grep -E "build.*Main|build.*View|setupMain" | head -1)
+          REAL_AUTH=$(strings "$BINARY" 2>/dev/null | grep -E "build.*Auth|build.*View|setupAuth" | head -1)
+          REAL_MAIN=$(strings "$BINARY" 2>/dev/null | grep -E "build.*Main|build.*View|setupMain" | head -1)
           echo "REAL_AUTH=$REAL_AUTH" >> $GITHUB_ENV
           echo "REAL_MAIN=$REAL_MAIN" >> $GITHUB_ENV
+          echo "提取的类名: $REAL_CLASS"
+          echo "提取的验证方法: $REAL_AUTH"
+          echo "提取的主界面方法: $REAL_MAIN"
 
-      # ---------- 3. Patch zxui.m ----------
+      # ---------- Patch zxui.m ----------
       - name: Patch zxui.m
         run: |
           if [ -n "$REAL_CLASS" ]; then
@@ -59,7 +53,7 @@ jobs:
             sed -i '' "s/NSSelectorFromString(@\"buildMainView\")/NSSelectorFromString(@\"$REAL_MAIN\")/g" zxui.m
           fi
 
-      # ---------- 4. 编译 zxui.dylib ----------
+      # ---------- 编译 ----------
       - name: Compile zxui.dylib
         run: |
           clang -arch arm64 \
@@ -77,14 +71,13 @@ jobs:
             zxui.m \
             -o zxui.dylib
 
-      # ---------- 5. 替换 fuck.dylib 并复制 zxui.dylib ----------
+      # ---------- 替换 fuck.dylib 并复制 zxui.dylib ----------
       - name: Copy dylibs
         run: |
-          APP_PATH="Unpacked/Payload/$APP_NAME"
-          cp fuck.dylib "$APP_PATH/fuck.dylib"
-          cp zxui.dylib "$APP_PATH/zxui.dylib"
+          cp fuck.dylib "Unpacked/Payload/$APP_NAME/fuck.dylib"
+          cp zxui.dylib "Unpacked/Payload/$APP_NAME/zxui.dylib"
 
-      # ---------- 6. 注入 zxui.dylib ----------
+      # ---------- 注入 ----------
       - name: Build insert_dylib
         run: |
           git clone https://github.com/tyilo/insert_dylib
@@ -95,27 +88,25 @@ jobs:
 
       - name: Inject dylib
         run: |
-          APP_PATH="Unpacked/Payload/$APP_NAME"
           insert_dylib --strip-codesig --inplace \
             "@executable_path/zxui.dylib" \
-            "$APP_PATH/$EXECUTABLE"
+            "Unpacked/Payload/$APP_NAME/$EXECUTABLE"
 
-      # ---------- 7. 签名 ----------
+      # ---------- 签名 ----------
       - name: Sign
         run: |
           brew install ldid
-          APP_PATH="Unpacked/Payload/$APP_NAME"
-          ldid -S "$APP_PATH/$EXECUTABLE"
-          ldid -S "$APP_PATH/fuck.dylib"
-          ldid -S "$APP_PATH/zxui.dylib"
+          ldid -S "Unpacked/Payload/$APP_NAME/$EXECUTABLE"
+          ldid -S "Unpacked/Payload/$APP_NAME/fuck.dylib"
+          ldid -S "Unpacked/Payload/$APP_NAME/zxui.dylib"
 
-      # ---------- 8. 重打包 ----------
+      # ---------- 重打包 ----------
       - name: Repack IPA
         run: |
           cd Unpacked
           zip -qr ../ZX.ipa .
 
-      # ---------- 9. 上传 ----------
+      # ---------- 上传 ----------
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
