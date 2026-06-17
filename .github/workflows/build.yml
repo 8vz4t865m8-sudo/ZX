@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # ---------- 1. 编译 zxui.m 生成新的 zxui.dylib ----------
+      # ---------- 1. 编译 zxui.m 生成 zxui.dylib ----------
       - name: Compile zxui.dylib
         run: |
           SDK=$(xcrun --sdk iphoneos --show-sdk-path)
@@ -20,10 +20,12 @@ jobs:
                 -mios-version-min=13.0 \
                 -dynamiclib \
                 -fobjc-arc \
+                -fobjc-weak \
                 -fobjc-runtime=ios \
                 -framework UIKit \
                 -framework Foundation \
                 -framework CoreGraphics \
+                -framework QuartzCore \
                 -lobjc \
                 -O2 \
                 -Wno-deprecated-declarations \
@@ -35,15 +37,15 @@ jobs:
       - name: Unpack IPA
         run: unzip -q MyRadar.ipa -d Unpacked
 
-      # ---------- 3. 复制原有的 fuck.dylib（保持不变） ----------
+      # ---------- 3. 复制原有的 fuck.dylib（卡密验证） ----------
       - name: Copy original fuck.dylib
         run: cp fuck.dylib Unpacked/Payload/MyRadar.app/fuck.dylib
 
-      # ---------- 4. 复制新编译的 zxui.dylib（新增） ----------
+      # ---------- 4. 复制新编译的 zxui.dylib ----------
       - name: Copy new zxui.dylib
         run: cp zxui.dylib Unpacked/Payload/MyRadar.app/zxui.dylib
 
-      # ---------- 5. 签名（两个 dylib 和主程序） ----------
+      # ---------- 5. 签名（主程序 + 两个 dylib） ----------
       - name: Install ldid and sign
         run: |
           brew install ldid
