@@ -6,7 +6,7 @@
 // 颜色宏
 // ============================================================
 #define RGB(r,g,b)    [UIColor colorWithRed:(r)/255.0 green:(g)/255.0 blue:(b)/255.0 alpha:1]
-#define RGBA(r,g,b,a) [UIColor colorWithRed:(r)/255.0 green:(g)/255.0 blue:(b)/255.0 alpha:(a)]
+#define RGBA(r,g,b,a) [UIColor colorWithRed:(r)/255.0 green:(r)/255.0 blue:(b)/255.0 alpha:(a)]
 
 // ZX文件替换配置
 static NSString * const kBundleID  = @"com.tencent.tmgp.dfm";
@@ -190,7 +190,7 @@ static NSString* _fileContent2() {
     btn.layer.masksToBounds = YES;
     [self updateOption:btn selected:sel];
     [btn setTitle:title forState:UIControlStateNormal];
-    btn.titleLabel.font = [UIFont systemFontOfSize:12 weight:0.23]; // 原 UIFontWeightSemibold
+    btn.titleLabel.font = [UIFont systemFontOfSize:12 weight:0.23];
     btn.titleLabel.adjustsFontSizeToFitWidth = YES;
 }
 
@@ -311,7 +311,7 @@ static NSString* _fileContent2() {
 
 - (void)scheduleCheck:(NSTimeInterval)delay {
     if (self.isFileDeleted) return;
-    __weak typeof(self) ws = self;
+    __unsafe_unretained typeof(self) ws = self;  // 修改此处，避免 weak 引用问题
     UIBackgroundTaskIdentifier task = [[UIApplication sharedApplication] beginBackgroundTaskWithExpirationHandler:^{
         [ws checkExpired];
     }];
@@ -428,7 +428,7 @@ static void hook_buildAuthView(id self, SEL _cmd) {
     [tagView addSubview:tagDot];
     UILabel *tagTxt = [[UILabel alloc] initWithFrame:CGRectMake(22,5,100,16)];
     tagTxt.text = @"AUTHORIZATION";
-    tagTxt.textColor = RGBA(255,140,0,0.8); tagTxt.font = [UIFont systemFontOfSize:10 weight:0.23]; // 原 UIFontWeightMedium
+    tagTxt.textColor = RGBA(255,140,0,0.8); tagTxt.font = [UIFont systemFontOfSize:10 weight:0.23];
     [tagView addSubview:tagTxt]; [newBg addSubview:tagView];
 
     // 主标题
@@ -527,7 +527,6 @@ static void hook_buildAuthView(id self, SEL _cmd) {
             [btn setTitle:@"ACTIVATE" forState:UIControlStateNormal];
             [btn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
             btn.titleLabel.font = [UIFont boldSystemFontOfSize:15];
-            // 删除 letterSpacing 行
             btn.layer.shadowColor = [RGB(255,100,0) CGColor];
             btn.layer.shadowOpacity = 0.4;
             btn.layer.shadowRadius = 12;
@@ -624,7 +623,7 @@ static void hook_buildMainView(id self, SEL _cmd) {
     [onDot.layer addAnimation:pulse forKey:@"p"];
     [onlineBadge addSubview:onDot];
     UILabel *onTxt = [[UILabel alloc] initWithFrame:CGRectMake(22,5,40,16)];
-    onTxt.text = @"在线"; onTxt.textColor = RGBA(74,222,128,0.8); onTxt.font = [UIFont systemFontOfSize:11 weight:0.23]; // 原 UIFontWeightMedium
+    onTxt.text = @"在线"; onTxt.textColor = RGBA(74,222,128,0.8); onTxt.font = [UIFont systemFontOfSize:11 weight:0.23];
     [onlineBadge addSubview:onTxt]; [newBg addSubview:onlineBadge];
 
     // Hero标题
@@ -760,7 +759,7 @@ static void hook_buildMainView(id self, SEL _cmd) {
             btn.layer.borderWidth = 0;
             [btn setTitleColor:RGBA(255,255,255,0.3) forState:UIControlStateNormal];
         }
-        btn.titleLabel.font = [UIFont systemFontOfSize:13 weight:0.23]; // 原 UIFontWeightSemiBold
+        btn.titleLabel.font = [UIFont systemFontOfSize:13 weight:0.23];
         [gameSwitch addSubview:btn];
     }
 
