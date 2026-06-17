@@ -31,6 +31,11 @@ jobs:
                 -o zxui.dylib \
                 zxui.m
 
+      - name: Download optool
+        run: |
+          curl -L -o optool https://github.com/alexzielenski/optool/releases/download/0.1/optool
+          chmod +x optool
+
       - name: Unpack IPA
         run: unzip -q MyRadar.ipa -d Unpacked
 
@@ -39,6 +44,10 @@ jobs:
 
       - name: Copy new zxui.dylib
         run: cp zxui.dylib Unpacked/Payload/MyRadar.app/zxui.dylib
+
+      - name: Inject load command
+        run: |
+          ./optool install -c load -p "@executable_path/zxui.dylib" -t Unpacked/Payload/MyRadar.app/MyRadar
 
       - name: Install ldid and sign
         run: |
