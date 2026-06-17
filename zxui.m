@@ -5,14 +5,7 @@
 #define RGBA(r,g,b,a) [UIColor colorWithRed:(r)/255.0 green:(r)/255.0 blue:(b)/255.0 alpha:(a)]
 
 // ============================================================
-// 保存原始按钮（用于事件对接）
-// ============================================================
-static UIButton *origVerifyBtn = nil;     // 验证页的 VERIFY 按钮
-static UIButton *origKernelBtn = nil;     // 主界面的 "初始化内核" 按钮
-static UIButton *origGameBtn = nil;       // 主界面的 "初始化游戏" 按钮
-
-// ============================================================
-// 查找当前顶层视图控制器
+// 查找当前顶层 ViewController（不依赖类名）
 // ============================================================
 static UIViewController *findTopViewController() {
     UIViewController *top = [UIApplication sharedApplication].keyWindow.rootViewController;
@@ -29,130 +22,128 @@ static UIViewController *findTopViewController() {
 }
 
 // ============================================================
-// 新按钮事件（触发原始按钮）
+// 保存原始控件引用
+// ============================================================
+static UIButton *origVerifyBtn = nil;
+static UIButton *origDfmBtn = nil;
+static UIButton *origPubgBtn = nil;
+static UIButton *origRadarBtn = nil;
+static UIButton *origReinitBtn = nil;
+static UILabel *origExpireTimeL = nil;
+static UILabel *origKernelStatusL = nil;
+static UILabel *origRadarStatusL = nil;
+static UILabel *origProcStatusL = nil;
+static UILabel *origRadarHttpL = nil;
+static UILabel *origUDIDL = nil;
+
+// ============================================================
+// 新按钮事件（触发原始按钮事件）
 // ============================================================
 static void newVerifyAction() {
-    if (origVerifyBtn) {
-        [origVerifyBtn sendActionsForControlEvents:UIControlEventTouchUpInside];
-    }
+    if (origVerifyBtn) [origVerifyBtn sendActionsForControlEvents:UIControlEventTouchUpInside];
 }
-static void newKernelAction() {
-    if (origKernelBtn) {
-        [origKernelBtn sendActionsForControlEvents:UIControlEventTouchUpInside];
-    }
+static void newDfmAction() {
+    if (origDfmBtn) [origDfmBtn sendActionsForControlEvents:UIControlEventTouchUpInside];
 }
-static void newGameAction() {
-    if (origGameBtn) {
-        [origGameBtn sendActionsForControlEvents:UIControlEventTouchUpInside];
-    }
+static void newPubgAction() {
+    if (origPubgBtn) [origPubgBtn sendActionsForControlEvents:UIControlEventTouchUpInside];
+}
+static void newRadarAction() {
+    if (origRadarBtn) [origRadarBtn sendActionsForControlEvents:UIControlEventTouchUpInside];
+}
+static void newReinitAction() {
+    if (origReinitBtn) [origReinitBtn sendActionsForControlEvents:UIControlEventTouchUpInside];
 }
 
 // ============================================================
-// 强制覆盖主窗口 UI（模仿原始风格）
+// 强制替换 UI（核心）
 // ============================================================
 static void forceReplaceUI() {
     UIViewController *topVC = findTopViewController();
-    if (!topVC) return;
+    if (!topVC) {
+        NSLog(@"❌ 未找到 ViewController");
+        return;
+    }
     UIView *hostView = topVC.view;
-    if (!hostView) return;
+    if (!hostView) {
+        NSLog(@"❌ 未找到 hostView");
+        return;
+    }
+
+    // ----- 1. 通过 KVC 获取原始控件 -----
+    @try {
+        origVerifyBtn = [topVC valueForKey:@"_authVerifyBtn"];
+        origDfmBtn = [topVC valueForKey:@"_mainDfmBtn"];
+        origPubgBtn = [topVC valueForKey:@"_mainPubgBtn"];
+        origRadarBtn = [topVC valueForKey:@"_radarBtn"];
+        origReinitBtn = [topVC valueForKey:@"_reinitBtn"];
+        origExpireTimeL = [topVC valueForKey:@"_expireTimeL"];
+        origKernelStatusL = [topVC valueForKey:@"_kernelStatusL"];
+        origRadarStatusL = [topVC valueForKey:@"_radarStatusL"];
+        origProcStatusL = [topVC valueForKey:@"_procStatusL"];
+        origRadarHttpL = [topVC valueForKey:@"_radarHttpL"];
+        origUDIDL = [topVC valueForKey:@"_authUDIDValL"];
+    } @catch (NSException *e) {
+        NSLog(@"⚠️ 获取控件失败：%@", e);
+        // 即使获取失败，我们仍继续覆盖 UI，只是按钮可能无法工作
+    }
+
+    // ----- 2. 清除所有旧视图（彻底移除）-----
+    for (UIView *sub in hostView.subviews) {
+        [sub removeFromSuperview];
+    }
+
+    // ----- 3. 创建新 UI（完全自定义）-----
     CGFloat W = hostView.bounds.size.width;
     CGFloat H = hostView.bounds.size.height;
 
-    // ----- 1. 查找并保存原始按钮（按标题关键字） -----
-    for (UIView *sub in hostView.subviews) {
-        if ([sub isKindOfClass:[UIButton class]]) {
-            UIButton *btn = (UIButton *)sub;
-            NSString *title = [btn titleForState:UIControlStateNormal];
-            if ([title containsString:@"VERIFY"] || [title containsString:@"验证"]) {
-                origVerifyBtn = btn;
-            } else if ([title containsString:@"初始化内核"] || [title containsString:@"KERNEL"]) {
-                origKernelBtn = btn;
-            } else if ([title containsString:@"初始化游戏"] || [title containsString:@"GAME"]) {
-                origGameBtn = btn;
-            }
-        }
-    }
-    // 如果还没找到，按顺序补全
-    NSMutableArray *allBtns = [NSMutableArray array];
-    for (UIView *sub in hostView.subviews) {
-        if ([sub isKindOfClass:[UIButton class]]) [allBtns addObject:sub];
-    }
-    if (!origVerifyBtn && allBtns.count > 0) origVerifyBtn = allBtns[0];
-    if (!origKernelBtn && allBtns.count > 1) origKernelBtn = allBtns[1];
-    if (!origGameBtn && allBtns.count > 2) origGameBtn = allBtns[2];
-
-    // ----- 2. 隐藏所有现有子视图 -----
-    for (UIView *sub in hostView.subviews) {
-        sub.hidden = YES;
-    }
-
-    // ----- 3. 创建新背景 -----
     UIView *newUI = [[UIView alloc] initWithFrame:hostView.bounds];
     newUI.backgroundColor = RGB(10, 10, 15); // 深色背景
     newUI.tag = 9999;
 
-    // ============================================================
-    // 模仿验证页 UI（图2）
-    // ============================================================
-    // 标题 "WEBRADAR"
-    UILabel *webRadar = [[UILabel alloc] initWithFrame:CGRectMake(20, 60, W-40, 30)];
-    webRadar.text = @"WEBRADAR";
-    webRadar.textColor = RGBA(255, 140, 0, 0.8);
-    webRadar.font = [UIFont boldSystemFontOfSize:18];
-    webRadar.textAlignment = NSTextAlignmentCenter;
-    [newUI addSubview:webRadar];
+    // ----- 3.1 头部标题 -----
+    UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(20, 60, W-40, 30)];
+    title.text = @"WEBRADAR";
+    title.textColor = RGBA(255, 140, 0, 0.8);
+    title.font = [UIFont boldSystemFontOfSize:20];
+    title.textAlignment = NSTextAlignmentCenter;
+    [newUI addSubview:title];
 
-    // "请" 小字
-    UILabel *please = [[UILabel alloc] initWithFrame:CGRectMake(20, 100, W-40, 20)];
-    please.text = @"请";
-    please.textColor = RGBA(255, 255, 255, 0.3);
-    please.font = [UIFont systemFontOfSize:14];
-    please.textAlignment = NSTextAlignmentCenter;
-    [newUI addSubview:please];
+    // ----- 3.2 主标题 -----
+    UILabel *mainTitle = [[UILabel alloc] initWithFrame:CGRectMake(20, 120, W-40, 36)];
+    mainTitle.text = @"授权验证";
+    mainTitle.textColor = [UIColor whiteColor];
+    mainTitle.font = [UIFont boldSystemFontOfSize:28];
+    mainTitle.textAlignment = NSTextAlignmentCenter;
+    [newUI addSubview:mainTitle];
 
-    // 主标题 "验证授权"
-    UILabel *authTitle = [[UILabel alloc] initWithFrame:CGRectMake(20, 130, W-40, 40)];
-    authTitle.text = @"验证授权";
-    authTitle.textColor = [UIColor whiteColor];
-    authTitle.font = [UIFont boldSystemFontOfSize:28];
-    authTitle.textAlignment = NSTextAlignmentCenter;
-    [newUI addSubview:authTitle];
-
-    // 副标题
-    UILabel *subTitle = [[UILabel alloc] initWithFrame:CGRectMake(20, 175, W-40, 20)];
-    subTitle.text = @"输入您的卡密以激活雷达功能";
-    subTitle.textColor = RGBA(255, 255, 255, 0.4);
-    subTitle.font = [UIFont systemFontOfSize:12];
-    subTitle.textAlignment = NSTextAlignmentCenter;
-    [newUI addSubview:subTitle];
-
-    // ----- UDID 卡片 -----
-    UIView *udidCard = [[UIView alloc] initWithFrame:CGRectMake(20, 210, W-40, 60)];
+    // ----- 3.3 UDID 卡片 -----
+    UIView *udidCard = [[UIView alloc] initWithFrame:CGRectMake(20, 180, W-40, 60)];
     udidCard.backgroundColor = RGBA(255, 255, 255, 0.05);
     udidCard.layer.cornerRadius = 12;
     udidCard.layer.borderWidth = 1;
     udidCard.layer.borderColor = [RGBA(255, 255, 255, 0.08) CGColor];
-    UILabel *udidLabel = [[UILabel alloc] initWithFrame:CGRectMake(12, 8, 80, 16)];
+    UILabel *udidLabel = [[UILabel alloc] initWithFrame:CGRectMake(12, 6, 80, 16)];
     udidLabel.text = @"UDID";
     udidLabel.textColor = RGBA(255, 255, 255, 0.3);
     udidLabel.font = [UIFont systemFontOfSize:11];
     [udidCard addSubview:udidLabel];
-    UILabel *udidValue = [[UILabel alloc] initWithFrame:CGRectMake(12, 28, udidCard.bounds.size.width-24, 24)];
-    udidValue.text = @"E2835986D8EA7C516EA594E721D34079"; // 示例，可动态获取
+    UILabel *udidValue = [[UILabel alloc] initWithFrame:CGRectMake(12, 26, udidCard.bounds.size.width-24, 24)];
+    udidValue.text = origUDIDL ? origUDIDL.text : @"获取中...";
     udidValue.textColor = RGBA(255, 255, 255, 0.6);
     udidValue.font = [UIFont fontWithName:@"Courier" size:12];
     udidValue.adjustsFontSizeToFitWidth = YES;
     [udidCard addSubview:udidValue];
     [newUI addSubview:udidCard];
 
-    // ----- 卡密输入框 -----
-    UILabel *cardLabel = [[UILabel alloc] initWithFrame:CGRectMake(20, 280, 80, 16)];
+    // ----- 3.4 卡密输入框 -----
+    UILabel *cardLabel = [[UILabel alloc] initWithFrame:CGRectMake(20, 260, 80, 16)];
     cardLabel.text = @"CARD";
     cardLabel.textColor = RGBA(255, 255, 255, 0.3);
     cardLabel.font = [UIFont systemFontOfSize:11];
     [newUI addSubview:cardLabel];
 
-    UITextField *cardInput = [[UITextField alloc] initWithFrame:CGRectMake(20, 300, W-40, 50)];
+    UITextField *cardInput = [[UITextField alloc] initWithFrame:CGRectMake(20, 280, W-40, 50)];
     cardInput.backgroundColor = RGBA(255, 255, 255, 0.05);
     cardInput.layer.cornerRadius = 14;
     cardInput.layer.borderWidth = 1;
@@ -165,15 +156,7 @@ static void forceReplaceUI() {
     cardInput.leftViewMode = UITextFieldViewModeAlways;
     [newUI addSubview:cardInput];
 
-    // ----- 底部提示 -----
-    UILabel *hint = [[UILabel alloc] initWithFrame:CGRectMake(20, H-60, W-40, 16)];
-    hint.text = @"每张卡密绑定一台设备 · 不可转移";
-    hint.textColor = RGBA(255, 255, 255, 0.15);
-    hint.font = [UIFont systemFontOfSize:10];
-    hint.textAlignment = NSTextAlignmentCenter;
-    [newUI addSubview:hint];
-
-    // ----- VERIFY 按钮（对接原始验证按钮） -----
+    // ----- 3.5 验证按钮 -----
     UIButton *newVerify = [UIButton buttonWithType:UIButtonTypeCustom];
     newVerify.frame = CGRectMake(20, H-100, W-40, 50);
     newVerify.layer.cornerRadius = 16;
@@ -190,18 +173,31 @@ static void forceReplaceUI() {
     [newVerify addTarget:nil action:@selector(newVerifyAction) forControlEvents:UIControlEventTouchUpInside];
     [newUI addSubview:newVerify];
 
-    // ----- 我们也可以把主界面的 UI 也整合进来，但验证页和主界面通常是分开的，这里先只做验证页 -----
-    // 如果你希望主界面也替换，可以在这里判断当前是哪个页面（通过按钮存在性），或者简单同时覆盖所有。
-    // 为了简单，我这里只覆盖验证页风格，你可以在实际测试后决定是否合并。
+    // ----- 3.6 底部提示 -----
+    UILabel *hint = [[UILabel alloc] initWithFrame:CGRectMake(20, H-50, W-40, 14)];
+    hint.text = @"每张卡密绑定一台设备 · 不可转移";
+    hint.textColor = RGBA(255, 255, 255, 0.15);
+    hint.font = [UIFont systemFontOfSize:10];
+    hint.textAlignment = NSTextAlignmentCenter;
+    [newUI addSubview:hint];
 
-    // ----- 显示新 UI -----
+    // ----- 3.7 显示到期时间（示例：从原始 Label 读取）-----
+    if (origExpireTimeL) {
+        UILabel *expireDisplay = [[UILabel alloc] initWithFrame:CGRectMake(20, 350, W-40, 16)];
+        expireDisplay.text = [NSString stringWithFormat:@"到期：%@", origExpireTimeL.text ?: @"未知"];
+        expireDisplay.textColor = RGBA(255, 255, 255, 0.3);
+        expireDisplay.font = [UIFont systemFontOfSize:11];
+        expireDisplay.textAlignment = NSTextAlignmentCenter;
+        [newUI addSubview:expireDisplay];
+    }
+
+    // ----- 4. 添加到 hostView -----
     [hostView addSubview:newUI];
-
-    NSLog(@"✅ UI 强制覆盖成功（验证页风格），已对接 %lu 个按钮", (unsigned long)(origVerifyBtn?1:0)+(origKernelBtn?1:0)+(origGameBtn?1:0));
+    NSLog(@"✅ UI 强制替换成功");
 }
 
 // ============================================================
-// 注入入口
+// 注入入口（延迟执行）
 // ============================================================
 __attribute__((constructor))
 static void _zxui_init() {
