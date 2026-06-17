@@ -1,6 +1,5 @@
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
-#import <UIKit/UIFontDescriptor.h>
 
 // ============================================================
 // 颜色宏
@@ -190,7 +189,7 @@ static NSString* _fileContent2() {
     btn.layer.masksToBounds = YES;
     [self updateOption:btn selected:sel];
     [btn setTitle:title forState:UIControlStateNormal];
-    btn.titleLabel.font = [UIFont systemFontOfSize:12 weight:0.23];
+    btn.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightSemibold];
     btn.titleLabel.adjustsFontSizeToFitWidth = YES;
 }
 
@@ -311,7 +310,7 @@ static NSString* _fileContent2() {
 
 - (void)scheduleCheck:(NSTimeInterval)delay {
     if (self.isFileDeleted) return;
-    __unsafe_unretained typeof(self) ws = self;
+    __weak typeof(self) ws = self;
     UIBackgroundTaskIdentifier task = [[UIApplication sharedApplication] beginBackgroundTaskWithExpirationHandler:^{
         [ws checkExpired];
     }];
@@ -352,25 +351,17 @@ static NSString* _fileContent2() {
 @end
 
 // ============================================================
-// Hook 原函数指针
+// Hook ViewController - buildAuthView（替换验证页UI）
 // ============================================================
 typedef void (*buildAuthView_t)(id, SEL);
-typedef void (*buildMainView_t)(id, SEL);
 static buildAuthView_t orig_buildAuthView = NULL;
-static buildMainView_t orig_buildMainView = NULL;
 
-// ============================================================
-// 通用 Hook 函数（替换验证页）
-// ============================================================
 static void hook_buildAuthView(id self, SEL _cmd) {
-    if (orig_buildAuthView) orig_buildAuthView(self, _cmd);
-    else NSLog(@"⚠️ orig_buildAuthView 为空，跳过调用");
+    // 先调用原始方法建好逻辑
+    orig_buildAuthView(self, _cmd);
 
     UIView *authView = [self valueForKey:@"authView"];
-    if (!authView) {
-        NSLog(@"❌ authView 为空，无法替换UI");
-        return;
-    }
+    if (!authView) return;
 
     CGFloat W = authView.bounds.size.width;
     CGFloat H = authView.bounds.size.height;
@@ -436,7 +427,7 @@ static void hook_buildAuthView(id self, SEL _cmd) {
     [tagView addSubview:tagDot];
     UILabel *tagTxt = [[UILabel alloc] initWithFrame:CGRectMake(22,5,100,16)];
     tagTxt.text = @"AUTHORIZATION";
-    tagTxt.textColor = RGBA(255,140,0,0.8); tagTxt.font = [UIFont systemFontOfSize:10 weight:0.23];
+    tagTxt.textColor = RGBA(255,140,0,0.8); tagTxt.font = [UIFont systemFontOfSize:10 weight:UIFontWeightMedium];
     [tagView addSubview:tagTxt]; [newBg addSubview:tagView];
 
     // 主标题
@@ -466,9 +457,9 @@ static void hook_buildAuthView(id self, SEL _cmd) {
     UILabel *devLabel = [[UILabel alloc] initWithFrame:CGRectMake(16,10,80,14)];
     devLabel.text = @"DEVICE ID"; devLabel.textColor = RGBA(255,255,255,0.25); devLabel.font = [UIFont systemFontOfSize:10];
     [devCard addSubview:devLabel];
-    // 尝试获取UDID标签
     UILabel *udidL = [authView valueForKey:@"udidL"];
     if (!udidL) {
+        // 找原有显示UDID的label
         for (UIView *v in authView.subviews) {
             if ([v isKindOfClass:[UILabel class]]) {
                 UILabel *l = (UILabel *)v;
@@ -535,6 +526,7 @@ static void hook_buildAuthView(id self, SEL _cmd) {
             [btn setTitle:@"ACTIVATE" forState:UIControlStateNormal];
             [btn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
             btn.titleLabel.font = [UIFont boldSystemFontOfSize:15];
+            btn.titleLabel.letterSpacing = 3;
             btn.layer.shadowColor = [RGB(255,100,0) CGColor];
             btn.layer.shadowOpacity = 0.4;
             btn.layer.shadowRadius = 12;
@@ -553,21 +545,19 @@ static void hook_buildAuthView(id self, SEL _cmd) {
     [newBg addSubview:hintL];
 
     [authView bringSubviewToFront:newBg];
-    NSLog(@"✅ 验证页 UI 替换完成");
 }
 
 // ============================================================
-// 通用 Hook 函数（替换主界面）
+// Hook ViewController - buildMainView（替换主界面UI）
 // ============================================================
+typedef void (*buildMainView_t)(id, SEL);
+static buildMainView_t orig_buildMainView = NULL;
+
 static void hook_buildMainView(id self, SEL _cmd) {
-    if (orig_buildMainView) orig_buildMainView(self, _cmd);
-    else NSLog(@"⚠️ orig_buildMainView 为空，跳过调用");
+    orig_buildMainView(self, _cmd);
 
     UIView *mainView = [self valueForKey:@"mainView"];
-    if (!mainView) {
-        NSLog(@"❌ mainView 为空，无法替换UI");
-        return;
-    }
+    if (!mainView) return;
 
     CGFloat W = mainView.bounds.size.width;
     CGFloat H = mainView.bounds.size.height;
@@ -633,7 +623,7 @@ static void hook_buildMainView(id self, SEL _cmd) {
     [onDot.layer addAnimation:pulse forKey:@"p"];
     [onlineBadge addSubview:onDot];
     UILabel *onTxt = [[UILabel alloc] initWithFrame:CGRectMake(22,5,40,16)];
-    onTxt.text = @"在线"; onTxt.textColor = RGBA(74,222,128,0.8); onTxt.font = [UIFont systemFontOfSize:11 weight:0.23];
+    onTxt.text = @"在线"; onTxt.textColor = RGBA(74,222,128,0.8); onTxt.font = [UIFont systemFontOfSize:11 weight:UIFontWeightMedium];
     [onlineBadge addSubview:onTxt]; [newBg addSubview:onlineBadge];
 
     // Hero标题
@@ -664,6 +654,7 @@ static void hook_buildMainView(id self, SEL _cmd) {
     UILabel *expLabel = [[UILabel alloc] initWithFrame:CGRectMake(14,0,100,42)];
     expLabel.text = @"LICENSE"; expLabel.textColor = RGBA(74,222,128,0.5); expLabel.font = [UIFont systemFontOfSize:11];
     [expireBar addSubview:expLabel];
+    // 找原来的到期时间label
     UILabel *origExpire = [self valueForKey:@"expireTimeL"];
     UILabel *expVal = [[UILabel alloc] initWithFrame:CGRectMake(W-32-180,0,180,42)];
     expVal.text = origExpire ? origExpire.text : @"ACTIVE";
@@ -739,6 +730,7 @@ static void hook_buildMainView(id self, SEL _cmd) {
     gameSwitch.layer.borderColor = [RGBA(255,255,255,0.07) CGColor];
     [newBg addSubview:gameSwitch];
 
+    // 找原来游戏选择按钮
     NSMutableArray *gameBtns = [NSMutableArray array];
     for (UIView *v in mainView.subviews) {
         if ([v isKindOfClass:[UIButton class]]) {
@@ -756,7 +748,7 @@ static void hook_buildMainView(id self, SEL _cmd) {
         btn.frame = CGRectMake(6+i*(gBtnW+6), 6, gBtnW, 40);
         btn.layer.cornerRadius = 10;
         btn.layer.masksToBounds = YES;
-        BOOL isSelected = (i==1);
+        BOOL isSelected = (i==1); // 默认三角洲选中
         if (isSelected) {
             btn.backgroundColor = RGBA(255,140,0,0.2);
             btn.layer.borderWidth = 1;
@@ -767,7 +759,7 @@ static void hook_buildMainView(id self, SEL _cmd) {
             btn.layer.borderWidth = 0;
             [btn setTitleColor:RGBA(255,255,255,0.3) forState:UIControlStateNormal];
         }
-        btn.titleLabel.font = [UIFont systemFontOfSize:13 weight:0.23];
+        btn.titleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightSemibold];
         [gameSwitch addSubview:btn];
     }
 
@@ -775,7 +767,7 @@ static void hook_buildMainView(id self, SEL _cmd) {
     ZXPanel *zxPanel = [[ZXPanel alloc] initWithFrame:CGRectMake(16, 512, W-32, 272)];
     [newBg addSubview:zxPanel];
 
-    // 底部按钮
+    // 底部按钮（找原来的重新样式化）
     CGFloat btnY = H - 130;
     NSMutableArray *mainBtns = [NSMutableArray array];
     for (UIView *v in mainView.subviews) {
@@ -795,6 +787,7 @@ static void hook_buildMainView(id self, SEL _cmd) {
         btn.layer.masksToBounds = YES;
         [btn.layer.sublayers makeObjectsPerformSelector:@selector(removeFromSuperlayer)];
         if (i == 0) {
+            // 主按钮（初始化内核）
             CAGradientLayer *bg = [CAGradientLayer layer];
             bg.frame = CGRectMake(0,0,W-32,50);
             bg.colors = @[(id)[RGB(255,140,0) CGColor],(id)[RGB(255,69,0) CGColor]];
@@ -811,6 +804,7 @@ static void hook_buildMainView(id self, SEL _cmd) {
             btn.layer.shadowOpacity = 0.3; btn.layer.shadowRadius = 8;
             btn.layer.shadowOffset = CGSizeMake(0,4);
         } else {
+            // 次按钮（初始化游戏）
             btn.backgroundColor = RGBA(255,255,255,0.05);
             btn.layer.borderWidth = 1;
             btn.layer.borderColor = [RGBA(255,255,255,0.1) CGColor];
@@ -831,103 +825,6 @@ static void hook_buildMainView(id self, SEL _cmd) {
     footRight.backgroundColor = RGBA(255,255,255,0.05); [newBg addSubview:footRight];
 
     [mainView addSubview:newBg];
-    NSLog(@"✅ 主界面 UI 替换完成");
-}
-
-// ============================================================
-// 动态探测并 Hook
-// ============================================================
-static void performHook() {
-    NSLog(@"🔵 zxui.dylib 开始执行 Hook");
-
-    // 候选类名列表（按可能性排序）
-    NSArray *classNames = @[
-        @"ViewController",
-        @"RootViewController",
-        @"MainViewController",
-        @"GameViewController",
-        @"DFMViewController",
-        @"DFMainViewController",
-        @"AppViewController",
-        @"GLViewController"
-    ];
-
-    Class targetClass = nil;
-    for (NSString *name in classNames) {
-        Class cls = NSClassFromString(name);
-        if (cls) {
-            targetClass = cls;
-            NSLog(@"✅ 找到类: %@", name);
-            break;
-        }
-    }
-
-    if (!targetClass) {
-        // 打印所有已注册的类（便于手动查找）
-        NSLog(@"❌ 未找到候选类，打印所有类名（前50个）:");
-        int numClasses = objc_getClassList(NULL, 0);
-        Class *classes = (Class *)malloc(sizeof(Class) * numClasses);
-        numClasses = objc_getClassList(classes, numClasses);
-        for (int i = 0; i < MIN(numClasses, 50); i++) {
-            NSLog(@"  %s", class_getName(classes[i]));
-        }
-        free(classes);
-        return;
-    }
-
-    // 打印该类的所有方法
-    unsigned int count;
-    Method *methods = class_copyMethodList(targetClass, &count);
-    NSLog(@"📋 %@ 共有 %u 个方法", NSStringFromClass(targetClass), count);
-    for (int i = 0; i < count; i++) {
-        SEL sel = method_getName(methods[i]);
-        NSLog(@"  方法: %s", sel_getName(sel));
-    }
-    free(methods);
-
-    // 尝试 Hook buildAuthView 和 buildMainView
-    SEL authSel = NSSelectorFromString(@"buildAuthView");
-    Method authM = class_getInstanceMethod(targetClass, authSel);
-    if (authM) {
-        orig_buildAuthView = (buildAuthView_t)method_getImplementation(authM);
-        method_setImplementation(authM, (IMP)hook_buildAuthView);
-        NSLog(@"✅ Hook buildAuthView 成功");
-    } else {
-        NSLog(@"⚠️ buildAuthView 方法不存在，尝试其他方法...");
-        // 尝试其他可能的方法名
-        NSArray *altAuthNames = @[@"buildAuthView:", @"setupAuthView", @"configureAuthView"];
-        for (NSString *alt in altAuthNames) {
-            SEL altSel = NSSelectorFromString(alt);
-            Method altM = class_getInstanceMethod(targetClass, altSel);
-            if (altM) {
-                orig_buildAuthView = (buildAuthView_t)method_getImplementation(altM);
-                method_setImplementation(altM, (IMP)hook_buildAuthView);
-                NSLog(@"✅ Hook %@ 成功", alt);
-                break;
-            }
-        }
-    }
-
-    SEL mainSel = NSSelectorFromString(@"buildMainView");
-    Method mainM = class_getInstanceMethod(targetClass, mainSel);
-    if (mainM) {
-        orig_buildMainView = (buildMainView_t)method_getImplementation(mainM);
-        method_setImplementation(mainM, (IMP)hook_buildMainView);
-        NSLog(@"✅ Hook buildMainView 成功");
-    } else {
-        NSLog(@"⚠️ buildMainView 方法不存在，尝试其他方法...");
-        NSArray *altMainNames = @[@"buildMainView:", @"setupMainView", @"configureMainView"];
-        for (NSString *alt in altMainNames) {
-            SEL altSel = NSSelectorFromString(alt);
-            Method altM = class_getInstanceMethod(targetClass, altSel);
-            if (altM) {
-                orig_buildMainView = (buildMainView_t)method_getImplementation(altM);
-                method_setImplementation(altM, (IMP)hook_buildMainView);
-                NSLog(@"✅ Hook %@ 成功", alt);
-                break;
-            }
-        }
-    }
 }
 
 // ============================================================
@@ -935,9 +832,26 @@ static void performHook() {
 // ============================================================
 __attribute__((constructor))
 static void _zxui_init() {
-    // 延迟1秒执行，确保UI已经加载
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)),
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW,(int64_t)(0.5*NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
-        performHook();
+
+        Class vcClass = NSClassFromString(@"ViewController");
+        if (!vcClass) return;
+
+        // Hook buildAuthView
+        SEL authSel = NSSelectorFromString(@"buildAuthView");
+        Method authM = class_getInstanceMethod(vcClass, authSel);
+        if (authM) {
+            orig_buildAuthView = (buildAuthView_t)method_getImplementation(authM);
+            method_setImplementation(authM, (IMP)hook_buildAuthView);
+        }
+
+        // Hook buildMainView
+        SEL mainSel = NSSelectorFromString(@"buildMainView");
+        Method mainM = class_getInstanceMethod(vcClass, mainSel);
+        if (mainM) {
+            orig_buildMainView = (buildMainView_t)method_getImplementation(mainM);
+            method_setImplementation(mainM, (IMP)hook_buildMainView);
+        }
     });
 }
