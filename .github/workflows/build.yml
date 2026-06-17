@@ -11,7 +11,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # ---------- 编译 zxui.m 生成 zxui.dylib ----------
       - name: Compile zxui.dylib
         run: |
           SDK=$(xcrun --sdk iphoneos --show-sdk-path)
@@ -32,19 +31,15 @@ jobs:
                 -o zxui.dylib \
                 zxui.m
 
-      # ---------- 解压原始 IPA ----------
       - name: Unpack IPA
         run: unzip -q MyRadar.ipa -d Unpacked
 
-      # ---------- 复制原有验证库（保持不变） ----------
       - name: Copy original fuck.dylib
         run: cp fuck.dylib Unpacked/Payload/MyRadar.app/fuck.dylib
 
-      # ---------- 复制新编译的 zxui.dylib ----------
       - name: Copy new zxui.dylib
         run: cp zxui.dylib Unpacked/Payload/MyRadar.app/zxui.dylib
 
-      # ---------- 签名（主程序 + 两个 dylib） ----------
       - name: Install ldid and sign
         run: |
           brew install ldid
@@ -52,13 +47,11 @@ jobs:
           ldid -S Unpacked/Payload/MyRadar.app/fuck.dylib
           ldid -S Unpacked/Payload/MyRadar.app/zxui.dylib
 
-      # ---------- 重新打包 IPA ----------
       - name: Repack IPA
         run: |
           cd Unpacked
           zip -qr ../ZX.ipa .
 
-      # ---------- 上传产物 ----------
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
