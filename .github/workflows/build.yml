@@ -30,14 +30,15 @@ jobs:
 
       - name: Patch zxui.m
         run: |
+          # macOS 的 sed -i 必须带备份后缀，这里用 '' 表示不备份
           if [ -n "$REAL_CLASS" ]; then
-            sed -i "s/NSClassFromString(@\"ViewController\")/NSClassFromString(@\"$REAL_CLASS\")/g" zxui.m
+            sed -i '' "s/NSClassFromString(@\"ViewController\")/NSClassFromString(@\"$REAL_CLASS\")/g" zxui.m
           fi
           if [ -n "$REAL_AUTH" ]; then
-            sed -i "s/NSSelectorFromString(@\"buildAuthView\")/NSSelectorFromString(@\"$REAL_AUTH\")/g" zxui.m
+            sed -i '' "s/NSSelectorFromString(@\"buildAuthView\")/NSSelectorFromString(@\"$REAL_AUTH\")/g" zxui.m
           fi
           if [ -n "$REAL_MAIN" ]; then
-            sed -i "s/NSSelectorFromString(@\"buildMainView\")/NSSelectorFromString(@\"$REAL_MAIN\")/g" zxui.m
+            sed -i '' "s/NSSelectorFromString(@\"buildMainView\")/NSSelectorFromString(@\"$REAL_MAIN\")/g" zxui.m
           fi
 
       - name: Compile zxui.dylib
@@ -59,8 +60,10 @@ jobs:
 
       - name: Copy dylibs
         run: |
-          cp fuck.dylib Unpacked/Payload/MyRadar.app/
-          cp zxui.dylib Unpacked/Payload/MyRadar.app/
+          # 用仓库的 fuck.dylib 替换 IPA 中原有的
+          cp fuck.dylib Unpacked/Payload/MyRadar.app/fuck.dylib
+          # 新增 zxui.dylib
+          cp zxui.dylib Unpacked/Payload/MyRadar.app/zxui.dylib
 
       - name: Build insert_dylib
         run: |
@@ -72,6 +75,7 @@ jobs:
 
       - name: Inject dylib
         run: |
+          # 只注入 zxui.dylib，fuck.dylib 保留原有加载方式
           insert_dylib --strip-codesig --inplace \
             "@executable_path/zxui.dylib" \
             Unpacked/Payload/MyRadar.app/MyRadar
