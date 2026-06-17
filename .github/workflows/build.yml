@@ -31,10 +31,12 @@ jobs:
                 -o zxui.dylib \
                 zxui.m
 
-      - name: Download optool
+      # 下载 insert_dylib（更可靠的加载命令注入工具）
+      - name: Download insert_dylib
         run: |
-          curl -L -o optool https://github.com/alexzielenski/optool/releases/download/0.1/optool
-          chmod +x optool
+          curl -L -o insert_dylib.zip https://github.com/tyilo/insert_dylib/releases/download/1.0.0/insert_dylib.zip
+          unzip insert_dylib.zip
+          chmod +x insert_dylib
 
       - name: Unpack IPA
         run: unzip -q MyRadar.ipa -d Unpacked
@@ -45,9 +47,10 @@ jobs:
       - name: Copy new zxui.dylib
         run: cp zxui.dylib Unpacked/Payload/MyRadar.app/zxui.dylib
 
+      # 注入加载命令，使 MyRadar 启动时加载 zxui.dylib
       - name: Inject load command
         run: |
-          ./optool install -c load -p "@executable_path/zxui.dylib" -t Unpacked/Payload/MyRadar.app/MyRadar
+          ./insert_dylib @executable_path/zxui.dylib Unpacked/Payload/MyRadar.app/MyRadar --all-yes
 
       - name: Install ldid and sign
         run: |
