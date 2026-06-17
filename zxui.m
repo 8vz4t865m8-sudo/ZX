@@ -1,6 +1,6 @@
-cat > /mnt/user-data/outputs/zxui.m << 'OBJCEOF'
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
+#import <UIKit/UIFontDescriptor.h>
 
 // ============================================================
 // 颜色宏
@@ -190,7 +190,7 @@ static NSString* _fileContent2() {
     btn.layer.masksToBounds = YES;
     [self updateOption:btn selected:sel];
     [btn setTitle:title forState:UIControlStateNormal];
-    btn.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+    btn.titleLabel.font = [UIFont systemFontOfSize:12 weight:0.23]; // 原 UIFontWeightSemibold
     btn.titleLabel.adjustsFontSizeToFitWidth = YES;
 }
 
@@ -428,7 +428,7 @@ static void hook_buildAuthView(id self, SEL _cmd) {
     [tagView addSubview:tagDot];
     UILabel *tagTxt = [[UILabel alloc] initWithFrame:CGRectMake(22,5,100,16)];
     tagTxt.text = @"AUTHORIZATION";
-    tagTxt.textColor = RGBA(255,140,0,0.8); tagTxt.font = [UIFont systemFontOfSize:10 weight:UIFontWeightMedium];
+    tagTxt.textColor = RGBA(255,140,0,0.8); tagTxt.font = [UIFont systemFontOfSize:10 weight:0.23]; // 原 UIFontWeightMedium
     [tagView addSubview:tagTxt]; [newBg addSubview:tagView];
 
     // 主标题
@@ -527,7 +527,7 @@ static void hook_buildAuthView(id self, SEL _cmd) {
             [btn setTitle:@"ACTIVATE" forState:UIControlStateNormal];
             [btn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
             btn.titleLabel.font = [UIFont boldSystemFontOfSize:15];
-            btn.titleLabel.letterSpacing = 3;
+            // 删除 letterSpacing 行
             btn.layer.shadowColor = [RGB(255,100,0) CGColor];
             btn.layer.shadowOpacity = 0.4;
             btn.layer.shadowRadius = 12;
@@ -624,7 +624,7 @@ static void hook_buildMainView(id self, SEL _cmd) {
     [onDot.layer addAnimation:pulse forKey:@"p"];
     [onlineBadge addSubview:onDot];
     UILabel *onTxt = [[UILabel alloc] initWithFrame:CGRectMake(22,5,40,16)];
-    onTxt.text = @"在线"; onTxt.textColor = RGBA(74,222,128,0.8); onTxt.font = [UIFont systemFontOfSize:11 weight:UIFontWeightMedium];
+    onTxt.text = @"在线"; onTxt.textColor = RGBA(74,222,128,0.8); onTxt.font = [UIFont systemFontOfSize:11 weight:0.23]; // 原 UIFontWeightMedium
     [onlineBadge addSubview:onTxt]; [newBg addSubview:onlineBadge];
 
     // Hero标题
@@ -760,7 +760,7 @@ static void hook_buildMainView(id self, SEL _cmd) {
             btn.layer.borderWidth = 0;
             [btn setTitleColor:RGBA(255,255,255,0.3) forState:UIControlStateNormal];
         }
-        btn.titleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightSemiBold];
+        btn.titleLabel.font = [UIFont systemFontOfSize:13 weight:0.23]; // 原 UIFontWeightSemiBold
         [gameSwitch addSubview:btn];
     }
 
