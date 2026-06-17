@@ -11,61 +11,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # ---------- 1. 解压 IPA ----------
       - name: Unpack IPA
         run: unzip -q MyRadar.ipa -d Unpacked
 
-      # ---------- 2. 从 MyRadar 中提取真实的类名和方法名 ----------
-      - name: Extract real names from MyRadar
+      - name: Extract real names
         id: extract
         run: |
           BINARY="Unpacked/Payload/MyRadar.app/MyRadar"
-          
-          # 提取所有包含 "Controller" 或 "View" 的类名，取第一个
-          REAL_CLASS=$(nm -gU "$BINARY" | grep -E "OBJC_CLASS.*Controller|OBJC_CLASS.*View" | head -1 | sed 's/.*_$_//')
+          REAL_CLASS=$(nm -gU "$BINARY" | grep "OBJC_CLASS" | grep -E "Controller|View" | head -1 | sed 's/.*_$_//')
           if [ -z "$REAL_CLASS" ]; then
-            # 如果没找到，尝试获取所有类名中的第一个（通常就是主控制器）
             REAL_CLASS=$(nm -gU "$BINARY" | grep "OBJC_CLASS" | head -1 | sed 's/.*_$_//')
           fi
-          echo "✅ 提取到类名: $REAL_CLASS"
           echo "REAL_CLASS=$REAL_CLASS" >> $GITHUB_ENV
-
-          # 提取包含 "build" 和 "View" 或 "Main" 的方法名
           REAL_AUTH=$(strings "$BINARY" | grep -E "build.*Auth|build.*View|setupAuth" | head -1)
           REAL_MAIN=$(strings "$BINARY" | grep -E "build.*Main|build.*View|setupMain" | head -1)
-          echo "✅ 提取到验证方法: $REAL_AUTH"
-          echo "✅ 提取到主界面方法: $REAL_MAIN"
           echo "REAL_AUTH=$REAL_AUTH" >> $GITHUB_ENV
           echo "REAL_MAIN=$REAL_MAIN" >> $GITHUB_ENV
 
-      # ---------- 3. 自动替换 zxui.m 中的硬编码字符串 ----------
-      - name: Patch zxui.m with real names
+      - name: Patch zxui.m
         run: |
-          # 备份原始文件
-          cp zxui.m zxui.m.bak
-          
-          # 替换类名
           if [ -n "$REAL_CLASS" ]; then
             sed -i "s/NSClassFromString(@\"ViewController\")/NSClassFromString(@\"$REAL_CLASS\")/g" zxui.m
-            sed -i "s/NSClassFromString(@\"RootViewController\")/NSClassFromString(@\"$REAL_CLASS\")/g" zxui.m  # 备用
-            echo "✅ 已替换类名为: $REAL_CLASS"
-          else
-            echo "⚠️ 未提取到类名，保留原值"
           fi
-          
-          # 替换验证页方法
           if [ -n "$REAL_AUTH" ]; then
             sed -i "s/NSSelectorFromString(@\"buildAuthView\")/NSSelectorFromString(@\"$REAL_AUTH\")/g" zxui.m
-            echo "✅ 已替换验证方法为: $REAL_AUTH"
           fi
-          
-          # 替换主界面方法
           if [ -n "$REAL_MAIN" ]; then
             sed -i "s/NSSelectorFromString(@\"buildMainView\")/NSSelectorFromString(@\"$REAL_MAIN\")/g" zxui.m
-            echo "✅ 已替换主界面方法为: $REAL_MAIN"
           fi
 
-      # ---------- 4. 编译 zxui.m ----------
       - name: Compile zxui.dylib
         run: |
           clang -arch arm64 \
@@ -82,9 +56,7 @@ jobs:
             -dynamiclib \
             zxui.m \
             -o zxui.dylib
-          echo "✅ 编译完成"
 
-      # ---------- 5. 复制 dylib 并注入加载命令（使用你旧代码成功的方法） ----------
       - name: Copy dylibs
         run: |
           cp fuck.dylib Unpacked/Payload/MyRadar.app/
@@ -104,7 +76,6 @@ jobs:
             "@executable_path/zxui.dylib" \
             Unpacked/Payload/MyRadar.app/MyRadar
 
-      # ---------- 6. 签名 ----------
       - name: Sign
         run: |
           brew install ldid
@@ -112,7 +83,6 @@ jobs:
           ldid -S Unpacked/Payload/MyRadar.app/fuck.dylib
           ldid -S Unpacked/Payload/MyRadar.app/zxui.dylib
 
-      # ---------- 7. 打包上传 ----------
       - name: Repack IPA
         run: |
           cd Unpacked
