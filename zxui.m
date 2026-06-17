@@ -1,302 +1,203 @@
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
 
-// ============================================================
-// 颜色宏
-// ============================================================
 #define RGB(r,g,b)    [UIColor colorWithRed:(r)/255.0 green:(g)/255.0 blue:(b)/255.0 alpha:1]
-#define RGBA(r,g,b,a) [UIColor colorWithRed:(r)/255.0 green:(g)/255.0 blue:(b)/255.0 alpha:(a)]
+#define RGBA(r,g,b,a) [UIColor colorWithRed:(r)/255.0 green:(r)/255.0 blue:(b)/255.0 alpha:(a)]
 
 // ============================================================
-// Hook ViewController - buildAuthView（替换验证页UI）
+// 保存原始按钮（用于事件对接）
 // ============================================================
-typedef void (*buildAuthView_t)(id, SEL);
-static buildAuthView_t orig_buildAuthView = NULL;
+static UIButton *origVerifyBtn = nil;     // 验证页的 VERIFY 按钮
+static UIButton *origKernelBtn = nil;     // 主界面的 "初始化内核" 按钮
+static UIButton *origGameBtn = nil;       // 主界面的 "初始化游戏" 按钮
 
-static void hook_buildAuthView(id self, SEL _cmd) {
-    // 调用原始方法
-    if (orig_buildAuthView) orig_buildAuthView(self, _cmd);
-
-    UIView *authView = [self valueForKey:@"authView"];
-    if (!authView) return;
-
-    CGFloat W = authView.bounds.size.width;
-    CGFloat H = authView.bounds.size.height;
-
-    // 完全覆盖原来的背景
-    UIView *newBg = [[UIView alloc] initWithFrame:authView.bounds];
-    newBg.backgroundColor = RGB(10,10,15);
-    [authView addSubview:newBg];
-
-    // 背景光晕
-    UIView *glow1 = [[UIView alloc] initWithFrame:CGRectMake(-60,-120,W+120,380)];
-    CAGradientLayer *g1 = [CAGradientLayer layer];
-    g1.frame = glow1.bounds; g1.type = kCAGradientLayerRadial;
-    g1.colors = @[(id)[RGBA(255,140,0,0.18) CGColor],(id)[RGBA(255,80,0,0.06) CGColor],(id)[[UIColor clearColor] CGColor]];
-    g1.locations = @[@0,@0.45,@1];
-    g1.startPoint = CGPointMake(0.5,0.5); g1.endPoint = CGPointMake(1,1);
-    [glow1.layer addSublayer:g1]; [newBg addSubview:glow1];
-
-    UIView *glow2 = [[UIView alloc] initWithFrame:CGRectMake(W-120,H-200,240,240)];
-    CAGradientLayer *g2 = [CAGradientLayer layer];
-    g2.frame = glow2.bounds; g2.type = kCAGradientLayerRadial;
-    g2.colors = @[(id)[RGBA(120,60,255,0.08) CGColor],(id)[[UIColor clearColor] CGColor]];
-    g2.locations = @[@0,@1];
-    g2.startPoint = CGPointMake(0.5,0.5); g2.endPoint = CGPointMake(1,1);
-    [glow2.layer addSublayer:g2]; [newBg addSubview:glow2];
-
-    // 品牌图标
-    UIView *brandMark = [[UIView alloc] initWithFrame:CGRectMake(28, 60, 36, 36)];
-    brandMark.backgroundColor = RGB(255,140,0);
-    brandMark.layer.cornerRadius = 10;
-    brandMark.layer.shadowColor = [RGB(255,140,0) CGColor];
-    brandMark.layer.shadowOpacity = 0.5;
-    brandMark.layer.shadowRadius = 8;
-    UILabel *markIcon = [[UILabel alloc] initWithFrame:brandMark.bounds];
-    markIcon.text = @"⚡"; markIcon.textAlignment = NSTextAlignmentCenter; markIcon.font = [UIFont systemFontOfSize:18];
-    [brandMark addSubview:markIcon]; [newBg addSubview:brandMark];
-
-    UILabel *brandTxt = [[UILabel alloc] initWithFrame:CGRectMake(72, 68, 120, 20)];
-    brandTxt.text = @"ZX 全系统";
-    brandTxt.textColor = RGBA(255,255,255,0.5);
-    brandTxt.font = [UIFont boldSystemFontOfSize:13];
-    [newBg addSubview:brandTxt];
-
-    UILabel *verLabel = [[UILabel alloc] initWithFrame:CGRectMake(W-80, 68, 60, 20)];
-    verLabel.text = @"3.0";
-    verLabel.textColor = RGBA(255,255,255,0.2);
-    verLabel.font = [UIFont systemFontOfSize:11];
-    verLabel.textAlignment = NSTextAlignmentRight;
-    verLabel.backgroundColor = RGBA(255,255,255,0.05);
-    verLabel.layer.cornerRadius = 6;
-    verLabel.layer.masksToBounds = YES;
-    [newBg addSubview:verLabel];
-
-    // 标签
-    UIView *tagView = [[UIView alloc] initWithFrame:CGRectMake(28, 120, 130, 26)];
-    tagView.backgroundColor = RGBA(255,140,0,0.1);
-    tagView.layer.cornerRadius = 13;
-    tagView.layer.borderWidth = 1;
-    tagView.layer.borderColor = [RGBA(255,140,0,0.2) CGColor];
-    UIView *tagDot = [[UIView alloc] initWithFrame:CGRectMake(10,10,6,6)];
-    tagDot.backgroundColor = RGB(255,140,0); tagDot.layer.cornerRadius = 3;
-    tagDot.layer.shadowColor = [RGB(255,140,0) CGColor]; tagDot.layer.shadowOpacity = 1; tagDot.layer.shadowRadius = 3;
-    [tagView addSubview:tagDot];
-    UILabel *tagTxt = [[UILabel alloc] initWithFrame:CGRectMake(22,5,100,16)];
-    tagTxt.text = @"AUTHORIZATION";
-    tagTxt.textColor = RGBA(255,140,0,0.8); tagTxt.font = [UIFont systemFontOfSize:10 weight:UIFontWeightMedium];
-    [tagView addSubview:tagTxt]; [newBg addSubview:tagView];
-
-    // 主标题
-    UILabel *titleL = [[UILabel alloc] initWithFrame:CGRectMake(28, 158, W-56, 50)];
-    titleL.text = @"访问需要授权";
-    titleL.textColor = [UIColor whiteColor];
-    titleL.font = [UIFont boldSystemFontOfSize:36];
-    [newBg addSubview:titleL];
-
-    UILabel *subL = [[UILabel alloc] initWithFrame:CGRectMake(28, 212, W-56, 18)];
-    subL.text = @"输入您的专属卡密以激活全部功能";
-    subL.textColor = RGBA(255,255,255,0.35);
-    subL.font = [UIFont systemFontOfSize:13];
-    [newBg addSubview:subL];
-
-    // DEVICE ID 卡片
-    UIView *devCard = [[UIView alloc] initWithFrame:CGRectMake(20, 248, W-40, 64)];
-    devCard.backgroundColor = RGBA(255,255,255,0.04);
-    devCard.layer.cornerRadius = 16;
-    devCard.layer.borderWidth = 1;
-    devCard.layer.borderColor = [RGBA(255,255,255,0.08) CGColor];
-    UIView *cardTopLine = [[UIView alloc] initWithFrame:CGRectMake(devCard.bounds.size.width*0.25,0,devCard.bounds.size.width*0.5,1)];
-    CAGradientLayer *ctg = [CAGradientLayer layer]; ctg.frame = cardTopLine.bounds;
-    ctg.colors = @[(id)[[UIColor clearColor] CGColor],(id)[RGBA(255,140,0,0.35) CGColor],(id)[[UIColor clearColor] CGColor]];
-    ctg.startPoint = CGPointMake(0,0.5); ctg.endPoint = CGPointMake(1,0.5);
-    [cardTopLine.layer addSublayer:ctg]; [devCard addSubview:cardTopLine];
-    UILabel *devLabel = [[UILabel alloc] initWithFrame:CGRectMake(16,10,80,14)];
-    devLabel.text = @"DEVICE ID"; devLabel.textColor = RGBA(255,255,255,0.25); devLabel.font = [UIFont systemFontOfSize:10];
-    [devCard addSubview:devLabel];
-    // 找原有UDID label
-    for (UIView *v in authView.subviews) {
-        if ([v isKindOfClass:[UILabel class]]) {
-            UILabel *l = (UILabel *)v;
-            if (l.text.length > 20 && [l.text rangeOfString:@"-"].location == NSNotFound) {
-                UILabel *devVal = [[UILabel alloc] initWithFrame:CGRectMake(16,28,devCard.bounds.size.width-32,20)];
-                devVal.text = l.text;
-                devVal.textColor = RGBA(255,255,255,0.5);
-                devVal.font = [UIFont fontWithName:@"Courier" size:11];
-                devVal.adjustsFontSizeToFitWidth = YES;
-                [devCard addSubview:devVal];
-                break;
-            }
-        }
+// ============================================================
+// 查找当前顶层视图控制器
+// ============================================================
+static UIViewController *findTopViewController() {
+    UIViewController *top = [UIApplication sharedApplication].keyWindow.rootViewController;
+    while (top.presentedViewController) {
+        top = top.presentedViewController;
     }
-    [newBg addSubview:devCard];
-
-    // 输入框标签
-    UILabel *inputLabel = [[UILabel alloc] initWithFrame:CGRectMake(20, 328, 100, 16)];
-    inputLabel.text = @"LICENSE KEY";
-    inputLabel.textColor = RGBA(255,255,255,0.3);
-    inputLabel.font = [UIFont systemFontOfSize:11];
-    [newBg addSubview:inputLabel];
-
-    // 美化输入框
-    for (UIView *v in authView.subviews) {
-        if ([v isKindOfClass:[UITextField class]]) {
-            UITextField *tf = (UITextField *)v;
-            tf.frame = CGRectMake(20, 348, W-40, 52);
-            tf.backgroundColor = RGBA(255,255,255,0.05);
-            tf.layer.cornerRadius = 14;
-            tf.layer.borderWidth = 1;
-            tf.layer.borderColor = [RGBA(255,255,255,0.1) CGColor];
-            tf.textColor = RGBA(255,255,255,0.85);
-            tf.font = [UIFont fontWithName:@"Courier" size:14];
-            tf.leftView = [[UIView alloc] initWithFrame:CGRectMake(0,0,16,0)];
-            tf.leftViewMode = UITextFieldViewModeAlways;
-            NSAttributedString *ph = [[NSAttributedString alloc] initWithString:@"XXXX-XXXX-XXXX-XXXX"
-                attributes:@{NSForegroundColorAttributeName: RGBA(255,255,255,0.15)}];
-            tf.attributedPlaceholder = ph;
-            [newBg addSubview:tf];
-            break;
-        }
+    if ([top isKindOfClass:[UINavigationController class]]) {
+        top = [(UINavigationController *)top topViewController];
     }
-
-    // 美化验证按钮
-    for (UIView *v in authView.subviews) {
-        if ([v isKindOfClass:[UIButton class]]) {
-            UIButton *btn = (UIButton *)v;
-            btn.frame = CGRectMake(20, H-80, W-40, 54);
-            btn.layer.cornerRadius = 16;
-            btn.layer.masksToBounds = YES;
-            [btn.layer.sublayers makeObjectsPerformSelector:@selector(removeFromSuperlayer)];
-            CAGradientLayer *btnG = [CAGradientLayer layer];
-            btnG.frame = CGRectMake(0,0,W-40,54);
-            btnG.colors = @[(id)[RGB(255,140,0) CGColor],(id)[RGB(255,69,0) CGColor]];
-            btnG.startPoint = CGPointMake(0,0.5); btnG.endPoint = CGPointMake(1,0.5);
-            [btn.layer insertSublayer:btnG atIndex:0];
-            CAGradientLayer *btnS = [CAGradientLayer layer];
-            btnS.frame = CGRectMake(0,0,W-40,27);
-            btnS.colors = @[(id)[RGBA(255,255,255,0.1) CGColor],(id)[[UIColor clearColor] CGColor]];
-            btnS.startPoint = CGPointMake(0.5,0); btnS.endPoint = CGPointMake(0.5,1);
-            [btn.layer addSublayer:btnS];
-            [btn setTitle:@"ACTIVATE" forState:UIControlStateNormal];
-            [btn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-            btn.titleLabel.font = [UIFont boldSystemFontOfSize:15];
-            btn.layer.shadowColor = [RGB(255,100,0) CGColor];
-            btn.layer.shadowOpacity = 0.4;
-            btn.layer.shadowRadius = 12;
-            btn.layer.shadowOffset = CGSizeMake(0,6);
-            [newBg addSubview:btn];
-            break;
-        }
+    if ([top isKindOfClass:[UITabBarController class]]) {
+        top = [(UITabBarController *)top selectedViewController];
     }
-
-    // 底部提示
-    UILabel *hintL = [[UILabel alloc] initWithFrame:CGRectMake(20, H-18, W-40, 14)];
-    hintL.text = @"每张卡密绑定一台设备 · 不可转移";
-    hintL.textColor = RGBA(255,255,255,0.15);
-    hintL.font = [UIFont systemFontOfSize:10];
-    hintL.textAlignment = NSTextAlignmentCenter;
-    [newBg addSubview:hintL];
-
-    [authView bringSubviewToFront:newBg];
+    return top;
 }
 
 // ============================================================
-// Hook ViewController - buildMainView（替换主界面UI）
+// 新按钮事件（触发原始按钮）
 // ============================================================
-typedef void (*buildMainView_t)(id, SEL);
-static buildMainView_t orig_buildMainView = NULL;
-
-static void hook_buildMainView(id self, SEL _cmd) {
-    if (orig_buildMainView) orig_buildMainView(self, _cmd);
-
-    UIView *mainView = [self valueForKey:@"mainView"];
-    if (!mainView) return;
-
-    CGFloat W = mainView.bounds.size.width;
-    CGFloat H = mainView.bounds.size.height;
-
-    UIView *newBg = [[UIView alloc] initWithFrame:mainView.bounds];
-    newBg.backgroundColor = RGB(10,10,15);
-
-    // 简单网格装饰
-    CAShapeLayer *grid = [CAShapeLayer layer];
-    grid.frame = newBg.bounds;
-    UIBezierPath *gPath = [UIBezierPath bezierPath];
-    for (CGFloat x = 0; x < W; x += 40) {
-        [gPath moveToPoint:CGPointMake(x,0)];
-        [gPath addLineToPoint:CGPointMake(x,H)];
+static void newVerifyAction() {
+    if (origVerifyBtn) {
+        [origVerifyBtn sendActionsForControlEvents:UIControlEventTouchUpInside];
     }
-    for (CGFloat y = 0; y < H; y += 40) {
-        [gPath moveToPoint:CGPointMake(0,y)];
-        [gPath addLineToPoint:CGPointMake(W,y)];
+}
+static void newKernelAction() {
+    if (origKernelBtn) {
+        [origKernelBtn sendActionsForControlEvents:UIControlEventTouchUpInside];
     }
-    grid.path = gPath.CGPath;
-    grid.strokeColor = [RGBA(255,255,255,0.02) CGColor];
-    grid.lineWidth = 0.5;
-    [newBg.layer addSublayer:grid];
+}
+static void newGameAction() {
+    if (origGameBtn) {
+        [origGameBtn sendActionsForControlEvents:UIControlEventTouchUpInside];
+    }
+}
 
-    // 顶部光晕
-    UIView *topGlow = [[UIView alloc] initWithFrame:CGRectMake(-60,-120,W+120,380)];
-    CAGradientLayer *tg = [CAGradientLayer layer];
-    tg.frame = topGlow.bounds; tg.type = kCAGradientLayerRadial;
-    tg.colors = @[(id)[RGBA(255,140,0,0.12) CGColor],(id)[RGBA(255,80,0,0.04) CGColor],(id)[[UIColor clearColor] CGColor]];
-    tg.locations = @[@0,@0.45,@1];
-    tg.startPoint = CGPointMake(0.5,0.5); tg.endPoint = CGPointMake(1,1);
-    [topGlow.layer addSublayer:tg]; [newBg addSubview:topGlow];
+// ============================================================
+// 强制覆盖主窗口 UI（模仿原始风格）
+// ============================================================
+static void forceReplaceUI() {
+    UIViewController *topVC = findTopViewController();
+    if (!topVC) return;
+    UIView *hostView = topVC.view;
+    if (!hostView) return;
+    CGFloat W = hostView.bounds.size.width;
+    CGFloat H = hostView.bounds.size.height;
 
-    // 品牌标题
-    UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(20, 80, W-40, 60)];
-    title.text = @"ZX 全系统 3.0";
-    title.textColor = [UIColor whiteColor];
-    title.font = [UIFont boldSystemFontOfSize:36];
-    title.textAlignment = NSTextAlignmentCenter;
-    [newBg addSubview:title];
+    // ----- 1. 查找并保存原始按钮（按标题关键字） -----
+    for (UIView *sub in hostView.subviews) {
+        if ([sub isKindOfClass:[UIButton class]]) {
+            UIButton *btn = (UIButton *)sub;
+            NSString *title = [btn titleForState:UIControlStateNormal];
+            if ([title containsString:@"VERIFY"] || [title containsString:@"验证"]) {
+                origVerifyBtn = btn;
+            } else if ([title containsString:@"初始化内核"] || [title containsString:@"KERNEL"]) {
+                origKernelBtn = btn;
+            } else if ([title containsString:@"初始化游戏"] || [title containsString:@"GAME"]) {
+                origGameBtn = btn;
+            }
+        }
+    }
+    // 如果还没找到，按顺序补全
+    NSMutableArray *allBtns = [NSMutableArray array];
+    for (UIView *sub in hostView.subviews) {
+        if ([sub isKindOfClass:[UIButton class]]) [allBtns addObject:sub];
+    }
+    if (!origVerifyBtn && allBtns.count > 0) origVerifyBtn = allBtns[0];
+    if (!origKernelBtn && allBtns.count > 1) origKernelBtn = allBtns[1];
+    if (!origGameBtn && allBtns.count > 2) origGameBtn = allBtns[2];
 
-    UILabel *sub = [[UILabel alloc] initWithFrame:CGRectMake(20, 150, W-40, 20)];
-    sub.text = @"DELTA FORCE · RADAR SYSTEM";
-    sub.textColor = RGBA(255,140,0,0.5);
-    sub.font = [UIFont systemFontOfSize:12];
-    sub.textAlignment = NSTextAlignmentCenter;
-    [newBg addSubview:sub];
+    // ----- 2. 隐藏所有现有子视图 -----
+    for (UIView *sub in hostView.subviews) {
+        sub.hidden = YES;
+    }
 
-    // 状态卡片（仅示例，无功能）
-    UIView *card1 = [[UIView alloc] initWithFrame:CGRectMake(20, 200, W-40, 60)];
-    card1.backgroundColor = RGBA(255,255,255,0.05);
-    card1.layer.cornerRadius = 12;
-    card1.layer.borderWidth = 1;
-    card1.layer.borderColor = [RGBA(255,255,255,0.08) CGColor];
-    UILabel *label1 = [[UILabel alloc] initWithFrame:CGRectMake(16, 10, W-72, 20)];
-    label1.text = @"RADAR HTTP";
-    label1.textColor = RGBA(255,255,255,0.3);
-    label1.font = [UIFont systemFontOfSize:11];
-    [card1 addSubview:label1];
-    UILabel *val1 = [[UILabel alloc] initWithFrame:CGRectMake(16, 32, W-72, 20)];
-    val1.text = @"http://zx.example.com";
-    val1.textColor = RGBA(255,255,255,0.6);
-    val1.font = [UIFont fontWithName:@"Courier" size:13];
-    [card1 addSubview:val1];
-    [newBg addSubview:card1];
+    // ----- 3. 创建新背景 -----
+    UIView *newUI = [[UIView alloc] initWithFrame:hostView.bounds];
+    newUI.backgroundColor = RGB(10, 10, 15); // 深色背景
+    newUI.tag = 9999;
 
-    // 底部按钮
-    UIButton *btn = [UIButton buttonWithType:UIButtonTypeCustom];
-    btn.frame = CGRectMake(20, H-100, W-40, 50);
-    btn.layer.cornerRadius = 16;
-    btn.layer.masksToBounds = YES;
-    CAGradientLayer *grd = [CAGradientLayer layer];
-    grd.frame = btn.bounds;
-    grd.colors = @[(id)[RGB(255,140,0) CGColor], (id)[RGB(255,69,0) CGColor]];
-    grd.startPoint = CGPointMake(0,0.5); grd.endPoint = CGPointMake(1,0.5);
-    [btn.layer insertSublayer:grd atIndex:0];
-    [btn setTitle:@"ACTIVATE RADAR" forState:UIControlStateNormal];
-    [btn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-    btn.titleLabel.font = [UIFont boldSystemFontOfSize:16];
-    btn.layer.shadowColor = [RGB(255,100,0) CGColor];
-    btn.layer.shadowOpacity = 0.3;
-    btn.layer.shadowRadius = 8;
-    btn.layer.shadowOffset = CGSizeMake(0,4);
-    [newBg addSubview:btn];
+    // ============================================================
+    // 模仿验证页 UI（图2）
+    // ============================================================
+    // 标题 "WEBRADAR"
+    UILabel *webRadar = [[UILabel alloc] initWithFrame:CGRectMake(20, 60, W-40, 30)];
+    webRadar.text = @"WEBRADAR";
+    webRadar.textColor = RGBA(255, 140, 0, 0.8);
+    webRadar.font = [UIFont boldSystemFontOfSize:18];
+    webRadar.textAlignment = NSTextAlignmentCenter;
+    [newUI addSubview:webRadar];
 
-    [mainView addSubview:newBg];
+    // "请" 小字
+    UILabel *please = [[UILabel alloc] initWithFrame:CGRectMake(20, 100, W-40, 20)];
+    please.text = @"请";
+    please.textColor = RGBA(255, 255, 255, 0.3);
+    please.font = [UIFont systemFontOfSize:14];
+    please.textAlignment = NSTextAlignmentCenter;
+    [newUI addSubview:please];
+
+    // 主标题 "验证授权"
+    UILabel *authTitle = [[UILabel alloc] initWithFrame:CGRectMake(20, 130, W-40, 40)];
+    authTitle.text = @"验证授权";
+    authTitle.textColor = [UIColor whiteColor];
+    authTitle.font = [UIFont boldSystemFontOfSize:28];
+    authTitle.textAlignment = NSTextAlignmentCenter;
+    [newUI addSubview:authTitle];
+
+    // 副标题
+    UILabel *subTitle = [[UILabel alloc] initWithFrame:CGRectMake(20, 175, W-40, 20)];
+    subTitle.text = @"输入您的卡密以激活雷达功能";
+    subTitle.textColor = RGBA(255, 255, 255, 0.4);
+    subTitle.font = [UIFont systemFontOfSize:12];
+    subTitle.textAlignment = NSTextAlignmentCenter;
+    [newUI addSubview:subTitle];
+
+    // ----- UDID 卡片 -----
+    UIView *udidCard = [[UIView alloc] initWithFrame:CGRectMake(20, 210, W-40, 60)];
+    udidCard.backgroundColor = RGBA(255, 255, 255, 0.05);
+    udidCard.layer.cornerRadius = 12;
+    udidCard.layer.borderWidth = 1;
+    udidCard.layer.borderColor = [RGBA(255, 255, 255, 0.08) CGColor];
+    UILabel *udidLabel = [[UILabel alloc] initWithFrame:CGRectMake(12, 8, 80, 16)];
+    udidLabel.text = @"UDID";
+    udidLabel.textColor = RGBA(255, 255, 255, 0.3);
+    udidLabel.font = [UIFont systemFontOfSize:11];
+    [udidCard addSubview:udidLabel];
+    UILabel *udidValue = [[UILabel alloc] initWithFrame:CGRectMake(12, 28, udidCard.bounds.size.width-24, 24)];
+    udidValue.text = @"E2835986D8EA7C516EA594E721D34079"; // 示例，可动态获取
+    udidValue.textColor = RGBA(255, 255, 255, 0.6);
+    udidValue.font = [UIFont fontWithName:@"Courier" size:12];
+    udidValue.adjustsFontSizeToFitWidth = YES;
+    [udidCard addSubview:udidValue];
+    [newUI addSubview:udidCard];
+
+    // ----- 卡密输入框 -----
+    UILabel *cardLabel = [[UILabel alloc] initWithFrame:CGRectMake(20, 280, 80, 16)];
+    cardLabel.text = @"CARD";
+    cardLabel.textColor = RGBA(255, 255, 255, 0.3);
+    cardLabel.font = [UIFont systemFontOfSize:11];
+    [newUI addSubview:cardLabel];
+
+    UITextField *cardInput = [[UITextField alloc] initWithFrame:CGRectMake(20, 300, W-40, 50)];
+    cardInput.backgroundColor = RGBA(255, 255, 255, 0.05);
+    cardInput.layer.cornerRadius = 14;
+    cardInput.layer.borderWidth = 1;
+    cardInput.layer.borderColor = [RGBA(255, 255, 255, 0.1) CGColor];
+    cardInput.textColor = [UIColor whiteColor];
+    cardInput.attributedPlaceholder = [[NSAttributedString alloc] initWithString:@"XXXX-XXXX-XXXX-XXXX"
+        attributes:@{NSForegroundColorAttributeName: RGBA(255, 255, 255, 0.2)}];
+    cardInput.font = [UIFont fontWithName:@"Courier" size:14];
+    cardInput.leftView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 16, 0)];
+    cardInput.leftViewMode = UITextFieldViewModeAlways;
+    [newUI addSubview:cardInput];
+
+    // ----- 底部提示 -----
+    UILabel *hint = [[UILabel alloc] initWithFrame:CGRectMake(20, H-60, W-40, 16)];
+    hint.text = @"每张卡密绑定一台设备 · 不可转移";
+    hint.textColor = RGBA(255, 255, 255, 0.15);
+    hint.font = [UIFont systemFontOfSize:10];
+    hint.textAlignment = NSTextAlignmentCenter;
+    [newUI addSubview:hint];
+
+    // ----- VERIFY 按钮（对接原始验证按钮） -----
+    UIButton *newVerify = [UIButton buttonWithType:UIButtonTypeCustom];
+    newVerify.frame = CGRectMake(20, H-100, W-40, 50);
+    newVerify.layer.cornerRadius = 16;
+    newVerify.layer.masksToBounds = YES;
+    CAGradientLayer *g1 = [CAGradientLayer layer];
+    g1.frame = newVerify.bounds;
+    g1.colors = @[(id)[RGB(255, 140, 0) CGColor], (id)[RGB(255, 69, 0) CGColor]];
+    g1.startPoint = CGPointMake(0, 0.5);
+    g1.endPoint = CGPointMake(1, 0.5);
+    [newVerify.layer insertSublayer:g1 atIndex:0];
+    [newVerify setTitle:@"VERIFY" forState:UIControlStateNormal];
+    [newVerify setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+    newVerify.titleLabel.font = [UIFont boldSystemFontOfSize:16];
+    [newVerify addTarget:nil action:@selector(newVerifyAction) forControlEvents:UIControlEventTouchUpInside];
+    [newUI addSubview:newVerify];
+
+    // ----- 我们也可以把主界面的 UI 也整合进来，但验证页和主界面通常是分开的，这里先只做验证页 -----
+    // 如果你希望主界面也替换，可以在这里判断当前是哪个页面（通过按钮存在性），或者简单同时覆盖所有。
+    // 为了简单，我这里只覆盖验证页风格，你可以在实际测试后决定是否合并。
+
+    // ----- 显示新 UI -----
+    [hostView addSubview:newUI];
+
+    NSLog(@"✅ UI 强制覆盖成功（验证页风格），已对接 %lu 个按钮", (unsigned long)(origVerifyBtn?1:0)+(origKernelBtn?1:0)+(origGameBtn?1:0));
 }
 
 // ============================================================
@@ -304,23 +205,8 @@ static void hook_buildMainView(id self, SEL _cmd) {
 // ============================================================
 __attribute__((constructor))
 static void _zxui_init() {
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW,(int64_t)(0.5*NSEC_PER_SEC)),
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
-        Class vcClass = NSClassFromString(@"ViewController");
-        if (!vcClass) return;
-
-        SEL authSel = NSSelectorFromString(@"buildAuthView");
-        Method authM = class_getInstanceMethod(vcClass, authSel);
-        if (authM) {
-            orig_buildAuthView = (buildAuthView_t)method_getImplementation(authM);
-            method_setImplementation(authM, (IMP)hook_buildAuthView);
-        }
-
-        SEL mainSel = NSSelectorFromString(@"buildMainView");
-        Method mainM = class_getInstanceMethod(vcClass, mainSel);
-        if (mainM) {
-            orig_buildMainView = (buildMainView_t)method_getImplementation(mainM);
-            method_setImplementation(mainM, (IMP)hook_buildMainView);
-        }
+        forceReplaceUI();
     });
 }
